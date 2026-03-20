@@ -1,0 +1,67 @@
+{
+  "entities": {
+    "Model": {
+      "title": "Model",
+      "description": "A talent/model profile.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the model." },
+        "category": { "type": "string", "description": "Category slug (e.g., women, men, feature-talent)." },
+        "height": { "type": "string", "description": "Height in cm." },
+        "bust": { "type": "string", "description": "Bust measurement." },
+        "waist": { "type": "string", "description": "Waist measurement." },
+        "hips": { "type": "string", "description": "Hips measurement." },
+        "shoes": { "type": "string", "description": "Shoe size." },
+        "hair": { "type": "string", "description": "Hair color." },
+        "eyes": { "type": "string", "description": "Eye color." },
+        "images": { "type": "array", "items": { "type": "string" }, "description": "Array of image URLs." },
+        "mainImage": { "type": "string", "description": "Primary image URL for listings." },
+        "isGrayscale": { "type": "boolean", "description": "Whether to apply grayscale filter." },
+        "slug": { "type": "string", "description": "URL-friendly name." },
+        "active": { "type": "boolean", "description": "Whether the model is currently featured." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "category", "mainImage", "slug"]
+    },
+    "News": {
+      "title": "News",
+      "description": "Agency news or updates.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "image": { "type": "string" },
+        "isGrayscale": { "type": "boolean" },
+        "active": { "type": "boolean" }
+      },
+      "required": ["title", "content", "date"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Admin user profile.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin"] }
+      },
+      "required": ["email", "role"]
+    },
+    "SiteSettings": {
+      "title": "Site Settings",
+      "description": "General site configuration.",
+      "type": "object",
+      "properties": {
+        "hero_image": { "type": "string" },
+        "about_image": { "type": "string" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "/models/{modelId}": { "schema": "Model", "description": "Collection of models." },
+    "/news/{newsId}": { "schema": "News", "description": "Collection of news items." },
+    "/users/{userId}": { "schema": "User", "description": "Admin users." },
+    "/site_settings/default": { "schema": "SiteSettings", "description": "Site-wide settings." }
+  }
+}

@@ -40,8 +40,9 @@ export default function AdminNewsForm() {
     e.preventDefault();
     setLoading(true);
     try {
+      const { id: _, ...restData } = formData;
       const data = {
-        ...formData,
+        ...restData,
         date: id ? formData.date : new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -59,9 +60,10 @@ export default function AdminNewsForm() {
         if (error) throw error;
       }
       navigate('/admin/dashboard');
-    } catch (err) {
-      console.error(err);
-      alert('Error saving news item.');
+    } catch (err: any) {
+      console.error('Full error object:', err);
+      const errorMessage = err.message || err.details || 'Unknown error occurred';
+      alert(`Error saving news item: ${errorMessage}`);
     } finally {
       setLoading(false);
     }

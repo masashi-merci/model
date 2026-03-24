@@ -118,9 +118,10 @@ export default function AdminDashboard() {
       if (error) throw error;
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving settings:", error);
-      alert("設定の保存に失敗しました。テーブルが存在するか確認してください。");
+      const errorMessage = error.message || error.details || 'Unknown error occurred';
+      alert(`設定の保存に失敗しました: ${errorMessage}\n\nデータベースのスキーマが最新か確認してください。`);
     } finally {
       setSavingSettings(false);
     }

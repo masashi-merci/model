@@ -43,13 +43,26 @@ export default function ImageUpload({ onUpload, label, folder = 'uploads', custo
         body: formData,
       });
 
+      const contentType = response.headers.get('content-type');
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Upload failed');
+        if (contentType && contentType.includes('application/json')) {
+          const data = await response.json();
+          throw new Error(data.error || 'Upload failed');
+        } else {
+          const text = await response.text();
+          console.error('Server returned non-JSON error:', text);
+          throw new Error(`Upload failed with status ${response.status}`);
+        }
       }
 
-      const data = await response.json();
-      onUpload(data.url);
+      if (contentType && contentType.includes('application/json')) {
+        const data = await response.json();
+        onUpload(data.url);
+      } else {
+        const text = await response.text();
+        console.error('Server returned non-JSON response:', text);
+        throw new Error('Server returned invalid response format');
+      }
       setProgress(100);
       
     } catch (err: any) {

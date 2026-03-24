@@ -68,8 +68,11 @@ export default function AdminModelForm() {
     setLoading(true);
     try {
       const slug = formData.name?.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '');
+      
+      // Prepare data, removing id if it's a new record
+      const { id: _, ...restData } = formData;
       const data = {
-        ...formData,
+        ...restData,
         slug,
         updated_at: new Date().toISOString(),
       };
@@ -87,9 +90,10 @@ export default function AdminModelForm() {
         if (error) throw error;
       }
       navigate('/admin/dashboard');
-    } catch (err) {
-      console.error(err);
-      alert('Error saving model.');
+    } catch (err: any) {
+      console.error('Full error object:', err);
+      const errorMessage = err.message || err.details || 'Unknown error occurred';
+      alert(`Error saving model: ${errorMessage}\n\nCheck if your database schema matches the latest updates (e.g. x_url column).`);
     } finally {
       setLoading(false);
     }

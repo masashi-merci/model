@@ -16,11 +16,19 @@ export default function ModelList() {
   useEffect(() => {
     const fetchModels = async () => {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('models')
         .select('*')
-        .eq('category', category)
-        .eq('active', true)
+        .eq('active', true);
+
+      if (category === 'models') {
+        // Special case: include models from other categories that have the 'MO（モデル）' tag
+        query = query.or(`category.eq.models,tags.cs.{"MO（モデル）"}`);
+      } else {
+        query = query.eq('category', category);
+      }
+
+      const { data, error } = await query
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: false });
       
@@ -36,7 +44,10 @@ export default function ModelList() {
 
   const filteredModels = activeRole === 'all'
     ? models
-    : models.filter(m => m.tags?.includes(activeRole));
+    : models.filter(m => {
+        if (activeRole === 'MO（モデル）' && m.category === 'models') return true;
+        return m.tags?.includes(activeRole);
+      });
 
   const categoryTitle = category?.replace('-', ' ').toUpperCase();
 
@@ -57,7 +68,7 @@ export default function ModelList() {
       </div>
 
       {/* Role Filter */}
-      {category === 'event-partners' && (
+      {(category === 'event-partners' || category === 'models') && (
         <div className="mb-12 flex flex-wrap justify-center gap-4 md:gap-8">
           <button 
             onClick={() => setActiveRole('all')}

@@ -148,15 +148,17 @@ export default function AdminDashboard() {
 
       // Update database
       try {
-        // We need to update all models that might have changed their order
-        // A simple way is to update the sort_order of all models based on their new index
-        const updates = newModels.map((m, idx) => ({
-          id: m.id,
-          sort_order: idx + 1
-        }));
+        // Use individual updates to avoid "null value" constraint errors with upsert
+        const updatePromises = newModels.map((m, idx) => 
+          supabase
+            .from('models')
+            .update({ sort_order: idx + 1 })
+            .eq('id', m.id)
+        );
 
-        const { error } = await supabase.from('models').upsert(updates);
-        if (error) throw error;
+        const results = await Promise.all(updatePromises);
+        const firstError = results.find(r => r.error)?.error;
+        if (firstError) throw firstError;
       } catch (error) {
         console.error("Error updating sort order:", error);
         alert("順番の保存に失敗しました。");

@@ -45,6 +45,12 @@ export default function AdminModelForm() {
   };
 
   useEffect(() => {
+    if (formData.category === 'models' && !formData.tags?.includes('MO（モデル）')) {
+      setFormData(prev => ({ ...prev, tags: [...(prev.tags || []), 'MO（モデル）'] }));
+    }
+  }, [formData.category]);
+
+  useEffect(() => {
     if (id) {
       const fetchModel = async () => {
         const { data, error } = await supabase

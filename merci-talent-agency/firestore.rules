@@ -1,0 +1,73 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: users
+    // - email: string
+    // - role: string (admin)
+    //
+    // Collection: models
+    // - name: string
+    // - category: string
+    // - mainImage: string
+    // - slug: string
+    // - height: string
+    // - bust: string
+    // - waist: string
+    // - hips: string
+    // - shoes: string
+    // - hair: string
+    // - eyes: string
+    // - images: list
+    // - active: bool
+    // - createdAt: timestamp
+    //
+    // Collection: news
+    // - title: string
+    // - content: string
+    // - date: timestamp
+    // - image: string
+    // - active: bool
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        (request.auth.token.email == "masashi@milz.tech" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isValidModel(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.category is string && data.category.size() > 0 &&
+             data.mainImage is string && data.mainImage.size() < 1000 &&
+             data.slug is string && data.slug.size() > 0;
+    }
+
+    function isValidNews(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 10000;
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /models/{modelId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidModel(request.resource.data);
+    }
+
+    match /news/{newsId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidNews(request.resource.data);
+    }
+  }
+}

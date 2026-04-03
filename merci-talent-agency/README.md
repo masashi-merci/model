@@ -1,6 +1,6 @@
 # Merci Talent Agency - Deployment Guide
 
-This project is a full-stack application built with React (Vite), Supabase, and Cloudflare R2.
+This project is a full-stack application built with React (Vite), Supabase, and Cloudflare R2
 It is designed to be deployed to **Cloudflare Pages**.
 
 ## 1. Prerequisites

@@ -78,4 +78,38 @@ export interface SiteSettings {
   updated_at: string;
 }
 
+export type OrderStatus = 'pending' | 'assigned' | 'completed' | 'cancelled';
+
+export interface Order {
+  id: string;
+  company_name: string;
+  contact_person: string;
+  email: string;
+  deadline?: string;
+  project_name?: string;
+  location_postal_code?: string;
+  location_prefecture?: string;
+  location_city?: string;
+  location_address_detail?: string;
+  rehearsal?: string;
+  rehearsal_date?: string;
+  rehearsal_start_time?: string;
+  rehearsal_end_time?: string;
+  rehearsal_location?: string;
+  main_event_date?: string;
+  main_event_start_time?: string;
+  main_event_end_time?: string;
+  hiring_count?: string;
+  job_description?: string;
+  conditions?: string[];
+  costume_provided?: string;
+  costume_image_url?: string;
+  selection_method?: string;
+  hourly_daily_rate?: string;
+  transportation?: string;
+  meal_allowance?: string;
+  status: OrderStatus;
+  created_at: string;
+}
+
 export type Category = 'artists' | 'event-partners' | 'models' | 'animals' | 'women' | 'men' | 'feature-talent' | 'commercial';

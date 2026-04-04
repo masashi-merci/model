@@ -11,20 +11,26 @@ export async function onRequestPost(context) {
     }
 
     // Use R2 binding directly (much lighter than S3 SDK)
-    if (!env.BUCKET) {
-      throw new Error('R2 Bucket binding is missing. Please check your Cloudflare dashboard.');
+    const bucket = env.BUCKET || env.MY_BUCKET;
+    if (!bucket) {
+      throw new Error('R2 Bucket binding is missing. Please check your Cloudflare dashboard. (Expected binding: BUCKET or MY_BUCKET)');
     }
 
     const fileName = `${folder}/${Date.now()}-${file.name}`;
     const arrayBuffer = await file.arrayBuffer();
 
-    await env.BUCKET.put(fileName, arrayBuffer, {
+    await bucket.put(fileName, arrayBuffer, {
       httpMetadata: {
         contentType: file.type,
       },
     });
 
-    const publicUrl = `${env.VITE_R2_PUBLIC_URL}/${fileName}`;
+    const publicUrlBase = env.VITE_R2_PUBLIC_URL;
+    if (!publicUrlBase) {
+      throw new Error('VITE_R2_PUBLIC_URL environment variable is missing. Please check your Cloudflare dashboard.');
+    }
+
+    const publicUrl = `${publicUrlBase}/${fileName}`;
 
     return new Response(JSON.stringify({ url: publicUrl }), {
       headers: { 'Content-Type': 'application/json' }

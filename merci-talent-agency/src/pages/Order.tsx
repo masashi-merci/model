@@ -6,16 +6,21 @@ export default function Order() {
   const [formData, setFormData] = useState({
     companyName: '',
     contactPerson: '',
-    address: '',
     email: '',
     deadline: '',
     projectName: '',
-    location: '',
+    locationPostalCode: '',
+    locationPrefecture: '',
+    locationCity: '',
+    locationAddressDetail: '',
     rehearsal: 'no',
-    rehearsalDateTime: '',
+    rehearsalDate: '',
+    rehearsalStartTime: '',
+    rehearsalEndTime: '',
     rehearsalLocation: '',
-    mainEvent: '',
-    mainEventDateTime: '',
+    mainEventDate: '',
+    mainEventStartTime: '',
+    mainEventEndTime: '',
     hiringCount: '',
     jobDescription: '',
     conditions: [] as string[],
@@ -31,6 +36,31 @@ export default function Order() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const lookupAddress = async (zip: string, type: 'client' | 'location') => {
+    const cleanZip = zip.replace(/-/g, '');
+    if (cleanZip.length !== 7) return;
+    
+    try {
+      const response = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${cleanZip}`);
+      const data = await response.json();
+      if (data.results) {
+        const result = data.results[0];
+        const prefecture = result.address1;
+        const city = result.address2 + result.address3;
+        
+        if (type === 'location') {
+          setFormData(prev => ({
+            ...prev,
+            locationPrefecture: prefecture,
+            locationCity: city
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Address lookup failed:', error);
+    }
+  };
 
   const conditionOptions = [
     '派手なネイルNG',
@@ -180,17 +210,6 @@ export default function Order() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-[10px] tracking-widest text-brand-gray uppercase block font-bold">住所</label>
-              <input 
-                type="text" 
-                required
-                className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
               <label className="text-[10px] tracking-widest text-brand-gray uppercase block font-bold">メールアドレス</label>
               <input 
                 type="email" 
@@ -229,14 +248,52 @@ export default function Order() {
               />
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="space-y-2">
+                <label className="text-[10px] tracking-widest text-brand-gray uppercase block font-bold">場所（郵便番号）</label>
+                <input 
+                  type="text" 
+                  required
+                  placeholder="000-0000"
+                  className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
+                  value={formData.locationPostalCode}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFormData({ ...formData, locationPostalCode: val });
+                    lookupAddress(val, 'location');
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] tracking-widest text-brand-gray uppercase block font-bold">都道府県</label>
+                <input 
+                  type="text" 
+                  required
+                  className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
+                  value={formData.locationPrefecture}
+                  onChange={(e) => setFormData({ ...formData, locationPrefecture: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] tracking-widest text-brand-gray uppercase block font-bold">市区町村</label>
+                <input 
+                  type="text" 
+                  required
+                  className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
+                  value={formData.locationCity}
+                  onChange={(e) => setFormData({ ...formData, locationCity: e.target.value })}
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <label className="text-[10px] tracking-widest text-brand-gray uppercase block font-bold">場所</label>
+              <label className="text-[10px] tracking-widest text-brand-gray uppercase block font-bold">それ以降の住所</label>
               <input 
                 type="text" 
                 required
                 className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                value={formData.locationAddressDetail}
+                onChange={(e) => setFormData({ ...formData, locationAddressDetail: e.target.value })}
               />
             </div>
           </div>
@@ -277,21 +334,48 @@ export default function Order() {
               <motion.div 
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
-                className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4"
+                className="space-y-8 pt-4"
               >
-                <div className="space-y-2">
+                <div className="space-y-6">
                   <label className="text-[10px] tracking-widest text-brand-gray uppercase block font-bold">リハーサル日時</label>
-                  <input 
-                    type="text" 
-                    className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
-                    value={formData.rehearsalDateTime}
-                    onChange={(e) => setFormData({ ...formData, rehearsalDateTime: e.target.value })}
-                  />
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="space-y-2">
+                      <label className="text-[10px] tracking-widest text-brand-gray uppercase block">日付</label>
+                      <input 
+                        type="date" 
+                        required={formData.rehearsal === 'yes'}
+                        className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
+                        value={formData.rehearsalDate}
+                        onChange={(e) => setFormData({ ...formData, rehearsalDate: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] tracking-widest text-brand-gray uppercase block">開始時刻</label>
+                      <input 
+                        type="time" 
+                        required={formData.rehearsal === 'yes'}
+                        className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
+                        value={formData.rehearsalStartTime}
+                        onChange={(e) => setFormData({ ...formData, rehearsalStartTime: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] tracking-widest text-brand-gray uppercase block">終了時刻</label>
+                      <input 
+                        type="time" 
+                        required={formData.rehearsal === 'yes'}
+                        className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
+                        value={formData.rehearsalEndTime}
+                        onChange={(e) => setFormData({ ...formData, rehearsalEndTime: e.target.value })}
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] tracking-widest text-brand-gray uppercase block font-bold">リハーサル場所</label>
                   <input 
                     type="text" 
+                    required={formData.rehearsal === 'yes'}
                     className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
                     value={formData.rehearsalLocation}
                     onChange={(e) => setFormData({ ...formData, rehearsalLocation: e.target.value })}
@@ -300,26 +384,40 @@ export default function Order() {
               </motion.div>
             )}
 
-            <div className="space-y-2">
-              <label className="text-[10px] tracking-widest text-brand-gray uppercase block font-bold">日程（本番）</label>
-              <input 
-                type="text" 
-                required
-                className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
-                value={formData.mainEvent}
-                onChange={(e) => setFormData({ ...formData, mainEvent: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
+            <div className="space-y-6">
               <label className="text-[10px] tracking-widest text-brand-gray uppercase block font-bold">本番日時</label>
-              <input 
-                type="text" 
-                required
-                className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
-                value={formData.mainEventDateTime}
-                onChange={(e) => setFormData({ ...formData, mainEventDateTime: e.target.value })}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] tracking-widest text-brand-gray uppercase block">日付</label>
+                  <input 
+                    type="date" 
+                    required
+                    className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
+                    value={formData.mainEventDate}
+                    onChange={(e) => setFormData({ ...formData, mainEventDate: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] tracking-widest text-brand-gray uppercase block">開始時刻</label>
+                  <input 
+                    type="time" 
+                    required
+                    className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
+                    value={formData.mainEventStartTime}
+                    onChange={(e) => setFormData({ ...formData, mainEventStartTime: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] tracking-widest text-brand-gray uppercase block">終了時刻</label>
+                  <input 
+                    type="time" 
+                    required
+                    className="w-full bg-transparent border-b border-brand-black/20 py-3 focus:outline-none focus:border-brand-black transition-colors" 
+                    value={formData.mainEventEndTime}
+                    onChange={(e) => setFormData({ ...formData, mainEventEndTime: e.target.value })}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 

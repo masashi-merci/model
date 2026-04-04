@@ -3,7 +3,7 @@ compatibility_date = "2024-04-03"
 compatibility_flags = ["nodejs_compat"]
 
 [[r2_buckets]]
-binding = "BUCKET"
+binding = "MY_BUCKET"
 bucket_name = "merci-talent-agency-r2"
 
 [pages_build_output_config]

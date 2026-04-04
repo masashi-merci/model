@@ -4,7 +4,7 @@ compatibility_flags = ["nodejs_compat"]
 
 [[r2_buckets]]
 binding = "MY_BUCKET"
-bucket_name = "merci-talent-agency-r2"
+bucket_name = "merci-model-assets"
 
 [pages_build_output_config]
 static_dir = "dist"

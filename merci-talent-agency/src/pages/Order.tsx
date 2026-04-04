@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Send, Check, Upload, X } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export default function Order() {
   const [formData, setFormData] = useState({
@@ -133,6 +134,44 @@ export default function Order() {
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to send order');
+      }
+
+      // Save to Supabase
+      try {
+        await supabase
+          .from('orders')
+          .insert([{
+            company_name: formData.companyName,
+            contact_person: formData.contactPerson,
+            email: formData.email,
+            deadline: formData.deadline,
+            project_name: formData.projectName,
+            location_postal_code: formData.locationPostalCode,
+            location_prefecture: formData.locationPrefecture,
+            location_city: formData.locationCity,
+            location_address_detail: formData.locationAddressDetail,
+            rehearsal: formData.rehearsal,
+            rehearsal_date: formData.rehearsalDate,
+            rehearsal_start_time: formData.rehearsalStartTime,
+            rehearsal_end_time: formData.rehearsalEndTime,
+            rehearsal_location: formData.rehearsalLocation,
+            main_event_date: formData.mainEventDate,
+            main_event_start_time: formData.mainEventStartTime,
+            main_event_end_time: formData.mainEventEndTime,
+            hiring_count: formData.hiringCount,
+            job_description: formData.jobDescription,
+            conditions: formData.conditions,
+            costume_provided: formData.costumeProvided,
+            costume_image_url: uploadedImageUrl,
+            selection_method: formData.selectionMethod,
+            hourly_daily_rate: formData.hourlyDailyRate,
+            transportation: formData.transportation,
+            meal_allowance: formData.mealAllowance,
+            status: 'pending'
+          }]);
+      } catch (supabaseErr) {
+        console.error('Error saving to Supabase:', supabaseErr);
+        // Don't block the success message if email was sent
       }
 
       setSubmitted(true);

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Model, News, SiteSettings, Work } from '../types';
+import { Model, News, Order, OrderStatus, SiteSettings, Work } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Edit, Trash2, LogOut, LayoutDashboard, Users, Newspaper, Settings, Save, Check, Briefcase, ArrowLeft, GripVertical } from 'lucide-react';
+import { Plus, Edit, Trash2, LogOut, LayoutDashboard, Users, Newspaper, Settings, Save, Check, Briefcase, ArrowLeft, GripVertical, Eye, X } from 'lucide-react';
 import Modal from '../components/Modal';
+import { format } from 'date-fns';
+import { motion } from 'motion/react';
 import ImageUpload from '../components/ImageUpload';
 import {
   DndContext,
@@ -107,9 +109,11 @@ export default function AdminDashboard() {
   const [models, setModels] = useState<Model[]>([]);
   const [news, setNews] = useState<News[]>([]);
   const [works, setWorks] = useState<Work[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
-  const [activeTab, setActiveTab] = useState<'models' | 'news' | 'works' | 'settings'>('models');
+  const [activeTab, setActiveTab] = useState<'models' | 'news' | 'works' | 'orders' | 'settings'>('models');
   const [loading, setLoading] = useState(true);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -190,11 +194,12 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [modelsRes, newsRes, worksRes, settingsRes] = await Promise.all([
+      const [modelsRes, newsRes, worksRes, settingsRes, ordersRes] = await Promise.all([
         supabase.from('models').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
         supabase.from('news').select('*').order('date', { ascending: false }),
         supabase.from('works').select('*').order('date', { ascending: false }),
-        supabase.from('site_settings').select('*').limit(1)
+        supabase.from('site_settings').select('*').limit(1),
+        supabase.from('orders').select('*').order('created_at', { ascending: false })
       ]);
 
       if (modelsRes.error) throw modelsRes.error;
@@ -204,6 +209,7 @@ export default function AdminDashboard() {
       setModels(modelsRes.data as Model[]);
       setNews(newsRes.data as News[]);
       setWorks(worksRes.data as Work[]);
+      setOrders(ordersRes.data as Order[] || []);
       
       const settingsData = settingsRes.data;
       if (settingsData && settingsData.length > 0) {
@@ -252,6 +258,45 @@ export default function AdminDashboard() {
 
   const openDeleteModal = (id: string, type: 'model' | 'news' | 'work') => {
     setDeleteModal({ isOpen: true, id, type });
+  };
+
+  const handleStatusChange = async (orderId: string, newStatus: OrderStatus) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId);
+      
+      if (error) throw error;
+      
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
+      }
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      alert("ステータスの更新に失敗しました。");
+    }
+  };
+
+  const getStatusLabel = (status: OrderStatus) => {
+    switch (status) {
+      case 'pending': return 'アサイン前';
+      case 'assigned': return 'アサイン完了';
+      case 'completed': return 'イベント完了';
+      case 'cancelled': return 'イベントキャンセル';
+      default: return status;
+    }
+  };
+
+  const getStatusColor = (status: OrderStatus) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-700';
+      case 'assigned': return 'bg-blue-100 text-blue-700';
+      case 'completed': return 'bg-green-100 text-green-700';
+      case 'cancelled': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
   };
 
   const handleLogout = async () => {
@@ -336,6 +381,12 @@ export default function AdminDashboard() {
           className={`pb-4 text-xs tracking-widest transition-all ${activeTab === 'news' ? 'border-b-2 border-brand-black font-bold' : 'text-brand-gray'}`}
         >
           NEWS ({news.length})
+        </button>
+        <button 
+          onClick={() => setActiveTab('orders')}
+          className={`pb-4 text-xs tracking-widest transition-all ${activeTab === 'orders' ? 'border-b-2 border-brand-black font-bold' : 'text-brand-gray'}`}
+        >
+          ORDERS ({orders.length})
         </button>
         <button 
           onClick={() => setActiveTab('settings')}
@@ -535,6 +586,235 @@ export default function AdminDashboard() {
               </tbody>
             </table>
           </div>
+        </div>
+      ) : activeTab === 'orders' ? (
+        <div>
+          <div className="bg-white shadow-sm overflow-hidden">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-brand-black/5 text-[10px] tracking-widest text-brand-gray uppercase">
+                <tr>
+                  <th className="px-6 py-4">CLIENT</th>
+                  <th className="px-6 py-4">ORDER DATE</th>
+                  <th className="px-6 py-4">EVENT DATE</th>
+                  <th className="px-6 py-4">STATUS</th>
+                  <th className="px-6 py-4 text-right">ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-brand-black/5">
+                {orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-brand-gray italic">No orders found.</td>
+                  </tr>
+                ) : orders.map(order => (
+                  <tr key={order.id} className="hover:bg-brand-black/5 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="font-serif text-lg">{order.company_name}</div>
+                      <div className="text-[10px] text-brand-gray">{order.contact_person}</div>
+                    </td>
+                    <td className="px-6 py-4 text-xs tracking-widest uppercase text-brand-gray">
+                      {format(new Date(order.created_at), 'yyyy.MM.dd')}
+                    </td>
+                    <td className="px-6 py-4 text-xs tracking-widest uppercase text-brand-gray">
+                      {order.main_event_date ? order.main_event_date.replace(/-/g, '.') : '-'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <select 
+                        className={`text-[10px] tracking-widest uppercase px-2 py-1 rounded border-none focus:ring-0 cursor-pointer ${getStatusColor(order.status)}`}
+                        value={order.status}
+                        onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
+                      >
+                        <option value="pending">アサイン前</option>
+                        <option value="assigned">アサイン完了</option>
+                        <option value="completed">イベント完了</option>
+                        <option value="cancelled">イベントキャンセル</option>
+                      </select>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button 
+                        onClick={() => setSelectedOrder(order)}
+                        className="text-brand-gray hover:text-brand-black transition-colors"
+                      >
+                        <Eye size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Order Detail Modal */}
+          {selectedOrder && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-brand-black/60 backdrop-blur-sm">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl"
+              >
+                <div className="sticky top-0 bg-white border-b border-brand-black/5 px-8 py-6 flex justify-between items-center z-10">
+                  <h2 className="text-2xl font-serif tracking-widest uppercase">Order Details</h2>
+                  <button onClick={() => setSelectedOrder(null)} className="text-brand-gray hover:text-brand-black transition-colors">
+                    <X size={24} />
+                  </button>
+                </div>
+                
+                <div className="p-8 space-y-12">
+                  {/* Basic Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                    <div className="space-y-6">
+                      <h3 className="text-xs tracking-[0.3em] font-bold uppercase border-b border-brand-black pb-2">Client Information</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Company Name</label>
+                          <p className="text-sm font-medium">{selectedOrder.company_name}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Contact Person</label>
+                          <p className="text-sm font-medium">{selectedOrder.contact_person}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Email</label>
+                          <p className="text-sm font-medium">{selectedOrder.email}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-6">
+                      <h3 className="text-xs tracking-[0.3em] font-bold uppercase border-b border-brand-black pb-2">Project Information</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Project Name</label>
+                          <p className="text-sm font-medium">{selectedOrder.project_name || '-'}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Deadline</label>
+                          <p className="text-sm font-medium">{selectedOrder.deadline || '-'}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Status</label>
+                          <span className={`text-[10px] tracking-widest uppercase px-2 py-1 rounded ${getStatusColor(selectedOrder.status)}`}>
+                            {getStatusLabel(selectedOrder.status)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Schedule & Location */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                    <div className="space-y-6">
+                      <h3 className="text-xs tracking-[0.3em] font-bold uppercase border-b border-brand-black pb-2">Schedule</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Main Event</label>
+                          <p className="text-sm font-medium">
+                            {selectedOrder.main_event_date} {selectedOrder.main_event_start_time} 〜 {selectedOrder.main_event_end_time}
+                          </p>
+                        </div>
+                        {selectedOrder.rehearsal === 'yes' && (
+                          <div>
+                            <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Rehearsal</label>
+                            <p className="text-sm font-medium">
+                              {selectedOrder.rehearsal_date} {selectedOrder.rehearsal_start_time} 〜 {selectedOrder.rehearsal_end_time}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-6">
+                      <h3 className="text-xs tracking-[0.3em] font-bold uppercase border-b border-brand-black pb-2">Location</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Address</label>
+                          <p className="text-sm font-medium">
+                            〒{selectedOrder.location_postal_code}<br />
+                            {selectedOrder.location_prefecture}{selectedOrder.location_city}<br />
+                            {selectedOrder.location_address_detail}
+                          </p>
+                        </div>
+                        {selectedOrder.rehearsal_location && (
+                          <div>
+                            <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Rehearsal Location</label>
+                            <p className="text-sm font-medium">{selectedOrder.rehearsal_location}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Job Details */}
+                  <div className="space-y-6">
+                    <h3 className="text-xs tracking-[0.3em] font-bold uppercase border-b border-brand-black pb-2">Job Details</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Hiring Count</label>
+                          <p className="text-sm font-medium">{selectedOrder.hiring_count || '-'}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Job Description</label>
+                          <p className="text-sm font-medium whitespace-pre-wrap">{selectedOrder.job_description || '-'}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Conditions</label>
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {selectedOrder.conditions?.map(c => (
+                              <span key={c} className="text-[10px] tracking-widest border border-brand-black/10 px-2 py-1 uppercase">{c}</span>
+                            )) || '-'}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Selection Method</label>
+                          <p className="text-sm font-medium">{selectedOrder.selection_method || '-'}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Rate</label>
+                          <p className="text-sm font-medium">{selectedOrder.hourly_daily_rate || '-'}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Transportation</label>
+                          <p className="text-sm font-medium">{selectedOrder.transportation || '-'}</p>
+                        </div>
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Meal Allowance</label>
+                          <p className="text-sm font-medium">{selectedOrder.meal_allowance || '-'}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Costume */}
+                  <div className="space-y-6">
+                    <h3 className="text-xs tracking-[0.3em] font-bold uppercase border-b border-brand-black pb-2">Costume</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                      <div>
+                        <label className="text-[10px] tracking-widest text-brand-gray uppercase block">Costume Provided</label>
+                        <p className="text-sm font-medium">{selectedOrder.costume_provided === 'yes' ? 'あり' : 'なし'}</p>
+                      </div>
+                      {selectedOrder.costume_image_url && (
+                        <div>
+                          <label className="text-[10px] tracking-widest text-brand-gray uppercase block mb-4">Costume Image</label>
+                          <div className="aspect-square max-w-xs overflow-hidden bg-brand-black/5">
+                            <img src={selectedOrder.costume_image_url} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="sticky bottom-0 bg-white border-t border-brand-black/5 px-8 py-6 flex justify-end z-10">
+                  <button 
+                    onClick={() => setSelectedOrder(null)}
+                    className="btn-primary px-12 py-3 tracking-[0.3em] text-xs"
+                  >
+                    CLOSE
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="max-w-2xl">
@@ -892,9 +1172,11 @@ export default function AdminDashboard() {
 }
 
 // Helper for date formatting
+/*
 function format(date: Date, pattern: string) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return pattern.replace('yyyy', String(y)).replace('MM', m).replace('dd', d);
 }
+*/

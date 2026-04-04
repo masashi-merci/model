@@ -10,6 +10,9 @@ export async function onRequestPost(context) {
     const toEmail = 'info@talentmerci.com';
     
     // Use Resend API
+    if (!env.RESEND_API_KEY) {
+      throw new Error('RESEND_API_KEY environment variable is missing. Please check your Cloudflare dashboard.');
+    }
     const resend = new Resend(env.RESEND_API_KEY);
     const fromEmail = env.RESEND_FROM_EMAIL || 'info@talentmerci.com';
 

@@ -113,6 +113,7 @@ export default function AdminDashboard() {
   const [settings, setSettings] = useState<SiteSettings | null>(null);
   const [activeTab, setActiveTab] = useState<'models' | 'news' | 'works' | 'orders' | 'settings'>('models');
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -193,6 +194,7 @@ export default function AdminDashboard() {
 
   const fetchData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [modelsRes, newsRes, worksRes, settingsRes, ordersRes] = await Promise.all([
         supabase.from('models').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
@@ -202,24 +204,29 @@ export default function AdminDashboard() {
         supabase.from('orders').select('*').order('created_at', { ascending: false })
       ]);
 
-      if (modelsRes.error) throw modelsRes.error;
-      if (newsRes.error) throw newsRes.error;
-      if (worksRes.error) throw worksRes.error;
+      const errors = [];
+      if (modelsRes.error) errors.push(`Models: ${modelsRes.error.message}`);
+      if (newsRes.error) errors.push(`News: ${newsRes.error.message}`);
+      if (worksRes.error) errors.push(`Works: ${worksRes.error.message}`);
+      if (ordersRes.error) errors.push(`Orders: ${ordersRes.error.message}`);
+      if (settingsRes.error && settingsRes.error.code !== 'PGRST116') errors.push(`Settings: ${settingsRes.error.message}`);
+
+      if (errors.length > 0) {
+        setError(errors.join(' | '));
+      }
       
-      setModels(modelsRes.data as Model[]);
-      setNews(newsRes.data as News[]);
-      setWorks(worksRes.data as Work[]);
+      setModels(modelsRes.data as Model[] || []);
+      setNews(newsRes.data as News[] || []);
+      setWorks(worksRes.data as Work[] || []);
       setOrders(ordersRes.data as Order[] || []);
       
       const settingsData = settingsRes.data;
       if (settingsData && settingsData.length > 0) {
         setSettings(settingsData[0] as SiteSettings);
-      } else if (settingsRes.error && settingsRes.error.code === 'PGRST116') {
-        // No settings found
-        console.log("No settings found");
       }
-    } catch (error) {
-      console.error("Error fetching data:", error);
+    } catch (err: any) {
+      console.error("Error fetching data:", err);
+      setError(err.message || "An unexpected error occurred while fetching data.");
     } finally {
       setLoading(false);
     }
@@ -395,6 +402,13 @@ export default function AdminDashboard() {
           SITE SETTINGS
         </button>
       </div>
+
+      {error && (
+        <div className="mb-8 p-4 bg-red-50 border border-red-200 text-red-600 text-xs tracking-widest uppercase rounded-lg flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => fetchData()} className="underline hover:no-underline">Retry</button>
+        </div>
+      )}
 
       {loading ? (
         <div className="py-20 text-center">

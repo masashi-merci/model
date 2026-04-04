@@ -13,10 +13,9 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL || '',
-  process.env.VITE_SUPABASE_ANON_KEY || ''
-);
+const supabase = (process.env.VITE_SUPABASE_URL && process.env.VITE_SUPABASE_ANON_KEY) 
+  ? createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY)
+  : null;
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -34,7 +33,7 @@ const r2Client = new S3Client({
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  const PORT = 3000; // Force port 3000 as per baseline guidelines
 
   // Middlewares
   app.use(express.json());
@@ -67,6 +66,10 @@ async function startServer() {
         return res.status(400).json({ error: 'No file uploaded' });
       }
 
+      if (!process.env.R2_ACCOUNT_ID || !process.env.R2_BUCKET_NAME || !process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY || !process.env.VITE_R2_PUBLIC_URL) {
+        throw new Error('Cloudflare R2 is not fully configured. Please set R2_ACCOUNT_ID, R2_BUCKET_NAME, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and VITE_R2_PUBLIC_URL in environment variables.');
+      }
+
       const folder = req.body.folder || 'uploads';
       const fileName = `${folder}/${Date.now()}-${req.file.originalname}`;
 
@@ -78,10 +81,11 @@ async function startServer() {
       }));
 
       const publicUrl = `${process.env.VITE_R2_PUBLIC_URL}/${fileName}`;
+      console.log('Upload successful:', publicUrl);
       res.json({ url: publicUrl });
     } catch (error: any) {
-      console.error('Upload error:', error);
-      res.status(500).json({ error: error.message });
+      console.error('Upload error detail:', error);
+      res.status(500).json({ error: error.message || 'Internal server error during upload' });
     }
   });
 
@@ -268,9 +272,15 @@ async function startServer() {
       console.log('Email sent via Resend:', resendData?.id);
       res.json({ success: true, id: resendData?.id });
     } catch (error: any) {
-      console.error('Email error:', error);
-      res.status(500).json({ error: error.message });
+      console.error('Email error detail:', error);
+      res.status(500).json({ error: error.message || 'Internal server error during email sending' });
     }
+  });
+
+  // API 404 Handler - prevent falling through to Vite SPA fallback
+  app.use('/api/*', (req, res) => {
+    console.warn(`404 API Not Found: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
   });
 
   // Vite middleware for development

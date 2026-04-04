@@ -84,7 +84,14 @@ export default function Order() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      
+      if (file.size > 5 * 1024 * 1024) {
+        setError('ファイルサイズは5MB以下にしてください。');
+        return;
+      }
+      
       setCostumeImage(file);
+      setError(null);
       
       // Preview
       const reader = new FileReader();
@@ -112,8 +119,17 @@ export default function Order() {
           body: uploadFormData,
         });
 
-        if (!uploadRes.ok) throw new Error('Failed to upload image');
-        const uploadData = await uploadRes.json();
+        const responseText = await uploadRes.text();
+        let uploadData;
+        try {
+          uploadData = JSON.parse(responseText);
+        } catch (e) {
+          throw new Error(`Server returned non-JSON response: ${responseText.slice(0, 100)}...`);
+        }
+
+        if (!uploadRes.ok) {
+          throw new Error(uploadData?.error || `Upload failed with status ${uploadRes.status}`);
+        }
         uploadedImageUrl = uploadData.url;
       }
 
@@ -131,9 +147,16 @@ export default function Order() {
         }),
       });
 
+      const responseText = await response.text();
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (e) {
+        throw new Error(`Server returned non-JSON response: ${responseText.slice(0, 100)}...`);
+      }
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to send order');
+        throw new Error(responseData?.error || `Failed to send order (Status: ${response.status})`);
       }
 
       // Save to Supabase

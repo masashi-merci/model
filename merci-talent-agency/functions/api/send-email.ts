@@ -54,7 +54,12 @@ export async function onRequestPost(context) {
         <p>${data.jobDescription.replace(/\n/g, '<br>')}</p>
         <p><strong>条件:</strong> ${data.conditions.join(', ') || 'なし'}</p>
         <p><strong>衣装支給の有無:</strong> ${data.costumeProvided === 'yes' ? '有' : '無'}</p>
-        ${data.costumeImageUrl ? `<p><strong>衣装画像:</strong> <a href="${data.costumeImageUrl}">${data.costumeImageUrl}</a></p>` : ''}
+        ${data.costumeImageUrl ? `
+          <p><strong>衣装画像:</strong><br>
+          <img src="${data.costumeImageUrl}" alt="衣装画像" style="max-width: 300px; height: auto; margin-top: 10px; border: 1px solid #eee;" />
+          <br><a href="${data.costumeImageUrl}" style="font-size: 12px; color: #666;">[ 画像をフルサイズで表示 ]</a>
+          </p>
+        ` : ''}
         <p><strong>選考方法:</strong> ${data.selectionMethod === 'document' ? '書類選考' : '書類選考通過後のオーディション'}</p>
         <p><strong>時給または日給:</strong> ${data.hourlyDailyRate}</p>
         <p><strong>交通費:</strong> ${data.transportation || 'なし'}</p>
@@ -105,7 +110,13 @@ export async function onRequestPost(context) {
         <div class="detail-item"><span class="label">業務内容:</span><br>${data.jobDescription.replace(/\n/g, '<br>')}</div>
         <div class="detail-item"><span class="label">条件:</span> ${data.conditions.join(', ') || 'なし'}</div>
         <div class="detail-item"><span class="label">衣装支給の有無:</span> ${data.costumeProvided === 'yes' ? '有' : '無'}</div>
-        ${data.costumeImageUrl ? `<div class="detail-item"><span class="label">衣装画像:</span> <a href="${data.costumeImageUrl}">${data.costumeImageUrl}</a></div>` : ''}
+        ${data.costumeImageUrl ? `
+          <div class="detail-item">
+            <span class="label">衣装画像:</span><br>
+            <img src="${data.costumeImageUrl}" alt="衣装画像" style="max-width: 200px; height: auto; margin-top: 10px; border: 1px solid #eee;" />
+            <br><a href="${data.costumeImageUrl}" style="font-size: 10px; color: #999; text-decoration: none;">[ VIEW FULL IMAGE ]</a>
+          </div>
+        ` : ''}
         <div class="detail-item"><span class="label">選考方法:</span> ${data.selectionMethod === 'document' ? '書類選考' : '書類選考通過後のオーディション'}</div>
         <div class="detail-item"><span class="label">時給または日給:</span> ${data.hourlyDailyRate}</div>
         <div class="detail-item"><span class="label">交通費:</span> ${data.transportation || 'なし'}</div>

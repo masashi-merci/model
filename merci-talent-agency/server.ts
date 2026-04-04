@@ -110,23 +110,25 @@ async function startServer() {
           <p>${data.message.replace(/\n/g, '<br>')}</p>
         `;
       } else if (type === 'order') {
+        const locationAddress = `〒${data.locationPostalCode || ''} ${data.locationPrefecture || ''}${data.locationCity || ''}${data.locationAddressDetail || ''}`;
+        const rehearsalDateTime = data.rehearsal === 'yes' ? `${data.rehearsalDate || ''} ${data.rehearsalStartTime || ''} ～ ${data.rehearsalEndTime || ''}` : '';
+        const mainEventDateTime = `${data.mainEventDate || ''} ${data.mainEventStartTime || ''} ～ ${data.mainEventEndTime || ''}`;
+
         subject = `【オーダー】${data.companyName}様より`;
         html = `
           <h3>オーダー内容</h3>
           <p><strong>会社名:</strong> ${data.companyName}</p>
           <p><strong>担当者名:</strong> ${data.contactPerson}</p>
-          <p><strong>住所:</strong> ${data.address}</p>
           <p><strong>メールアドレス:</strong> ${data.email}</p>
           <p><strong>募集締切日:</strong> ${data.deadline}</p>
           <p><strong>案件名:</strong> ${data.projectName}</p>
-          <p><strong>場所:</strong> ${data.location}</p>
+          <p><strong>場所:</strong> ${locationAddress}</p>
           <p><strong>リハーサル有無:</strong> ${data.rehearsal === 'yes' ? '有' : '無'}</p>
           ${data.rehearsal === 'yes' ? `
-            <p><strong>リハーサル日時:</strong> ${data.rehearsalDateTime}</p>
+            <p><strong>リハーサル日時:</strong> ${rehearsalDateTime}</p>
             <p><strong>リハーサル場所:</strong> ${data.rehearsalLocation}</p>
           ` : ''}
-          <p><strong>日程（本番）:</strong> ${data.mainEvent}</p>
-          <p><strong>本番日時:</strong> ${data.mainEventDateTime}</p>
+          <p><strong>本番日時:</strong> ${mainEventDateTime}</p>
           <p><strong>採用人数:</strong> ${data.hiringCount}</p>
           <p><strong>業務内容:</strong></p>
           <p>${data.jobDescription.replace(/\n/g, '<br>')}</p>
@@ -167,21 +169,23 @@ async function startServer() {
           ? `${data.companyName || ''}<br>${data.contactPerson || ''} 様` 
           : `${data.name || ''} 様`;
 
+        const locationAddress = `〒${data.locationPostalCode || ''} ${data.locationPrefecture || ''}${data.locationCity || ''}${data.locationAddressDetail || ''}`;
+        const rehearsalDateTime = data.rehearsal === 'yes' ? `${data.rehearsalDate || ''} ${data.rehearsalStartTime || ''} ～ ${data.rehearsalEndTime || ''}` : '';
+        const mainEventDateTime = `${data.mainEventDate || ''} ${data.mainEventStartTime || ''} ～ ${data.mainEventEndTime || ''}`;
+
         const orderDetails = isOrder ? `
           <div class="detail-item"><span class="label">会社名:</span> ${data.companyName}</div>
           <div class="detail-item"><span class="label">担当者名:</span> ${data.contactPerson}</div>
-          <div class="detail-item"><span class="label">住所:</span> ${data.address}</div>
           <div class="detail-item"><span class="label">メールアドレス:</span> ${data.email}</div>
           <div class="detail-item"><span class="label">募集締切日:</span> ${data.deadline}</div>
           <div class="detail-item"><span class="label">案件名:</span> ${data.projectName}</div>
-          <div class="detail-item"><span class="label">場所:</span> ${data.location}</div>
+          <div class="detail-item"><span class="label">場所:</span> ${locationAddress}</div>
           <div class="detail-item"><span class="label">リハーサル有無:</span> ${data.rehearsal === 'yes' ? '有' : '無'}</div>
           ${data.rehearsal === 'yes' ? `
-            <div class="detail-item"><span class="label">リハーサル日時:</span> ${data.rehearsalDateTime}</div>
+            <div class="detail-item"><span class="label">リハーサル日時:</span> ${rehearsalDateTime}</div>
             <div class="detail-item"><span class="label">リハーサル場所:</span> ${data.rehearsalLocation}</div>
           ` : ''}
-          <div class="detail-item"><span class="label">日程（本番）:</span> ${data.mainEvent}</div>
-          <div class="detail-item"><span class="label">本番日時:</span> ${data.mainEventDateTime}</div>
+          <div class="detail-item"><span class="label">本番日時:</span> ${mainEventDateTime}</div>
           <div class="detail-item"><span class="label">採用人数:</span> ${data.hiringCount}</div>
           <div class="detail-item"><span class="label">業務内容:</span><br>${data.jobDescription.replace(/\n/g, '<br>')}</div>
           <div class="detail-item"><span class="label">条件:</span> ${data.conditions.join(', ') || 'なし'}</div>

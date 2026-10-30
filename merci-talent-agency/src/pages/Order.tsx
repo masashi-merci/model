@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Send, Check, Upload, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -35,6 +35,8 @@ export default function Order() {
   const [costumeImage, setCostumeImage] = useState<File | null>(null);
   const [costumeImageUrl, setCostumeImageUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitting = useRef(false);
+  const [notificationWarning, setNotificationWarning] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -85,6 +87,10 @@ export default function Order() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       
+      if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
+        setError('JPEG、PNG、GIF、WebP画像を選択してください。');
+        return;
+      }
       if (file.size > 5 * 1024 * 1024) {
         setError('ファイルサイズは5MB以下にしてください。');
         return;
@@ -104,6 +110,9 @@ export default function Order() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current) return;
+    submitting.current = true;
+    let saved = false;
     setIsSubmitting(true);
     setError(null);
 
@@ -131,32 +140,6 @@ export default function Order() {
           throw new Error(uploadData?.error || `Upload failed with status ${uploadRes.status}`);
         }
         uploadedImageUrl = uploadData.url;
-      }
-
-      const response = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          type: 'order',
-          data: {
-            ...formData,
-            costumeImageUrl: uploadedImageUrl,
-          },
-        }),
-      });
-
-      const responseText = await response.text();
-      let responseData;
-      try {
-        responseData = JSON.parse(responseText);
-      } catch (e) {
-        throw new Error(`Server returned non-JSON response: ${responseText.slice(0, 100)}...`);
-      }
-
-      if (!response.ok) {
-        throw new Error(responseData?.error || `Failed to send order (Status: ${response.status})`);
       }
 
       // Save to Supabase
@@ -194,15 +177,51 @@ export default function Order() {
 
       if (supabaseErr) {
         console.error('Error saving to Supabase:', supabaseErr);
-        throw new Error(`Order saved but database record failed: ${supabaseErr.message}`);
+        throw new Error(`Order could not be saved: ${supabaseErr.message}`);
+      }
+
+      saved = true;
+
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          type: 'order',
+          data: {
+            ...formData,
+            costumeImageUrl: uploadedImageUrl,
+          },
+        }),
+      });
+
+      const responseText = await response.text();
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (e) {
+        throw new Error(`Server returned non-JSON response: ${responseText.slice(0, 100)}...`);
+      }
+
+      if (!response.ok) {
+        throw new Error(responseData?.error || `Failed to send order (Status: ${response.status})`);
       }
 
       setSubmitted(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       console.error('Error submitting order:', err);
-      setError(err.message || 'Something went wrong. Please try again later.');
+      if (saved) {
+        // The order already exists: never invite a retry that would create another record.
+        setNotificationWarning(true);
+        setSubmitted(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        setError(err.message || 'Something went wrong. Please try again later.');
+      }
     } finally {
+      submitting.current = false;
       setIsSubmitting(false);
     }
   };
@@ -223,6 +242,7 @@ export default function Order() {
             オーダーを承りました。内容を確認の上、担当者より折り返しご連絡させていただきます。<br />
             送信ありがとうございました。
           </p>
+          {notificationWarning && <p role="status" className="text-sm text-brand-gray">オーダーは保存されましたが、確認メールを送信できませんでした。再送信は不要です。</p>}
           <button 
             onClick={() => window.location.href = '/'}
             className="btn-primary px-12 py-4 tracking-[0.3em] text-xs"
@@ -569,7 +589,7 @@ export default function Order() {
                     <label className="cursor-pointer flex items-center space-x-2 px-4 py-2 bg-brand-black/5 hover:bg-brand-black/10 transition-colors rounded-lg text-xs tracking-widest uppercase">
                       <Upload size={14} />
                       <span>Upload Image</span>
-                      <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
+                      <input type="file" className="hidden" accept="image/jpeg,image/png,image/gif,image/webp" onChange={handleFileChange} />
                     </label>
                     {costumeImage && <span className="text-xs text-brand-gray">{costumeImage.name}</span>}
                   </div>

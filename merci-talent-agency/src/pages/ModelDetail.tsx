@@ -69,11 +69,13 @@ export default function ModelDetail() {
   useEffect(() => {
     const fetchModel = async () => {
       setLoading(true);
+      setModel(null);
       try {
         const { data, error } = await supabase
           .from('models')
           .select('*')
           .eq('slug', slug)
+          .eq('active', true)
           .single();
         
         if (error) throw error;

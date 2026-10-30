@@ -16,15 +16,22 @@ export default function AdminLogin() {
     setLoading(true);
     setError('');
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (error) throw error;
+      const response = await fetch('/api/admin-session', {
+        headers: { Authorization: `Bearer ${data.session.access_token}` }, cache: 'no-store',
+      });
+      if (!response.ok) {
+        await supabase.auth.signOut();
+        throw new Error('Administrator permission could not be verified');
+      }
       navigate('/admin/dashboard');
     } catch (err: any) {
       console.error(err);
-      setError('Invalid email or password. Please try again.');
+      setError('Sign-in or administrator permission could not be verified. Please contact the site owner.');
     } finally {
       setLoading(false);
     }

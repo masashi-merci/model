@@ -1,3 +1,4 @@
+import { supabase } from '../lib/supabase';
 import React, { useState, useRef } from 'react';
 import { Upload, X, AlertCircle, Loader2 } from 'lucide-react';
 
@@ -16,7 +17,7 @@ export default function ImageUpload({ onUpload, label, folder = 'uploads', custo
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
+    if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.type)) {
       setError('画像ファイルを選択してください。');
       return;
     }
@@ -38,8 +39,11 @@ export default function ImageUpload({ onUpload, label, folder = 'uploads', custo
       }
       formData.append('file', file);
 
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Administrator sign-in required');
       const response = await fetch('/api/upload', {
         method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
         body: formData,
       });
 
@@ -116,7 +120,7 @@ export default function ImageUpload({ onUpload, label, folder = 'uploads', custo
           ref={fileInputRef}
           onChange={onFileSelect}
           className="hidden"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/gif,image/webp"
         />
 
         {uploading ? (

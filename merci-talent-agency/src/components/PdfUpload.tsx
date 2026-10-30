@@ -1,3 +1,4 @@
+import { supabase } from '../lib/supabase';
 import React, { useState, useRef } from 'react';
 import { FileText, X, AlertCircle, Loader2, Upload } from 'lucide-react';
 
@@ -38,8 +39,11 @@ export default function PdfUpload({ onUpload, label, folder = 'profiles', custom
         formData.append('customName', customName);
       }
 
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Administrator sign-in required');
       const response = await fetch('/api/upload', {
         method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
         body: formData,
       });
 

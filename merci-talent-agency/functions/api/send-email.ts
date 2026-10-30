@@ -1,10 +1,16 @@
 import { Resend } from 'resend';
+import { boundedBody, checkRequest, errorResponse, HttpError, validateEmailPayload } from '../_lib/security';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
-    const { type, data } = await request.json();
+    checkRequest(request, 'email', 5);
+    if (!request.headers.get('content-type')?.startsWith('application/json')) throw new HttpError(415, 'JSON required');
+    const bytes = await boundedBody(request, 32 * 1024);
+    let payload: unknown;
+    try { payload = JSON.parse(new TextDecoder().decode(bytes)); } catch { throw new HttpError(400, 'Invalid JSON'); }
+    const { type, data, email } = validateEmailPayload(payload, env.VITE_R2_PUBLIC_URL);
 
     // Hardcoded recipient as requested
     const toEmail = 'info@talentmerci.com';
@@ -16,11 +22,9 @@ export async function onRequestPost(context) {
     const resend = new Resend(env.RESEND_API_KEY);
     const fromEmail = env.RESEND_FROM_EMAIL || 'info@talentmerci.com';
 
-    let subject = '';
     let html = '';
 
     if (type === 'contact') {
-      subject = `【お問い合わせ】${data.name}様より`;
       html = `
         <h3>お問い合わせ内容</h3>
         <p><strong>お名前:</strong> ${data.name}</p>
@@ -34,7 +38,6 @@ export async function onRequestPost(context) {
       const rehearsalDateTime = data.rehearsal === 'yes' ? `${data.rehearsalDate || ''} ${data.rehearsalStartTime || ''} ～ ${data.rehearsalEndTime || ''}` : '';
       const mainEventDateTime = `${data.mainEventDate || ''} ${data.mainEventStartTime || ''} ～ ${data.mainEventEndTime || ''}`;
 
-      subject = `【オーダー】${data.companyName}様より`;
       html = `
         <h3>オーダー内容</h3>
         <p><strong>会社名:</strong> ${data.companyName}</p>
@@ -71,9 +74,9 @@ export async function onRequestPost(context) {
     const { data: resendData, error: resendError } = await resend.emails.send({
       from: `Merci Talent Agency <${fromEmail}>`,
       to: [toEmail],
-      subject: subject,
+      subject: type === 'order' ? '【オーダー】新しいお申し込み' : '【お問い合わせ】新しいメッセージ',
       html: html,
-      replyTo: data.email
+      replyTo: email
     });
 
     if (resendError) throw resendError;
@@ -85,47 +88,6 @@ export async function onRequestPost(context) {
         ? '【Merci Talent Agency】オーダーを承りました' 
         : '【Merci Talent Agency】お問い合わせありがとうございます';
       
-      const greeting = isOrder 
-        ? `${data.companyName || ''}<br>${data.contactPerson || ''} 様` 
-        : `${data.name || ''} 様`;
-
-      const locationAddress = `〒${data.locationPostalCode || ''} ${data.locationPrefecture || ''}${data.locationCity || ''}${data.locationAddressDetail || ''}`;
-      const rehearsalDateTime = data.rehearsal === 'yes' ? `${data.rehearsalDate || ''} ${data.rehearsalStartTime || ''} ～ ${data.rehearsalEndTime || ''}` : '';
-      const mainEventDateTime = `${data.mainEventDate || ''} ${data.mainEventStartTime || ''} ～ ${data.mainEventEndTime || ''}`;
-
-      const orderDetails = isOrder ? `
-        <div class="detail-item"><span class="label">会社名:</span> ${data.companyName}</div>
-        <div class="detail-item"><span class="label">担当者名:</span> ${data.contactPerson}</div>
-        <div class="detail-item"><span class="label">メールアドレス:</span> ${data.email}</div>
-        <div class="detail-item"><span class="label">募集締切日:</span> ${data.deadline}</div>
-        <div class="detail-item"><span class="label">案件名:</span> ${data.projectName}</div>
-        <div class="detail-item"><span class="label">場所:</span> ${locationAddress}</div>
-        <div class="detail-item"><span class="label">リハーサル有無:</span> ${data.rehearsal === 'yes' ? '有' : '無'}</div>
-        ${data.rehearsal === 'yes' ? `
-          <div class="detail-item"><span class="label">リハーサル日時:</span> ${rehearsalDateTime}</div>
-          <div class="detail-item"><span class="label">リハーサル場所:</span> ${data.rehearsalLocation}</div>
-        ` : ''}
-        <div class="detail-item"><span class="label">本番日時:</span> ${mainEventDateTime}</div>
-        <div class="detail-item"><span class="label">採用人数:</span> ${data.hiringCount}</div>
-        <div class="detail-item"><span class="label">業務内容:</span><br>${data.jobDescription.replace(/\n/g, '<br>')}</div>
-        <div class="detail-item"><span class="label">条件:</span> ${data.conditions.join(', ') || 'なし'}</div>
-        <div class="detail-item"><span class="label">衣装支給の有無:</span> ${data.costumeProvided === 'yes' ? '有' : '無'}</div>
-        ${data.costumeImageUrl ? `
-          <div class="detail-item">
-            <span class="label">衣装画像:</span><br>
-            <img src="${data.costumeImageUrl}" alt="衣装画像" style="max-width: 200px; height: auto; margin-top: 10px; border: 1px solid #eee;" />
-            <br><a href="${data.costumeImageUrl}" style="font-size: 10px; color: #999; text-decoration: none;">[ VIEW FULL IMAGE ]</a>
-          </div>
-        ` : ''}
-        <div class="detail-item"><span class="label">選考方法:</span> ${data.selectionMethod === 'document' ? '書類選考' : '書類選考通過後のオーディション'}</div>
-        <div class="detail-item"><span class="label">時給または日給:</span> ${data.hourlyDailyRate}</div>
-        <div class="detail-item"><span class="label">交通費:</span> ${data.transportation || 'なし'}</div>
-        <div class="detail-item"><span class="label">食事代:</span> ${data.mealAllowance || 'なし'}</div>
-      ` : `
-        <div class="detail-item"><span class="label">件名:</span> ${data.subject}</div>
-        <div class="detail-item"><span class="label">メッセージ:</span><br>${data.message.replace(/\n/g, '<br>')}</div>
-      `;
-
       const autoReplyHtml = `
         <!DOCTYPE html>
         <html>
@@ -154,13 +116,13 @@ export async function onRequestPost(context) {
               <div class="logo">Merci Talent Agency</div>
             </div>
             <div class="content">
-              <p class="greeting">${greeting}</p>
+              <p class="greeting">${isOrder ? 'ご担当者' : 'お客様'} 様</p>
               <p>この度は、Merci Talent Agencyへ${isOrder ? 'オーダー' : 'お問い合わせ'}をいただき、誠にありがとうございます。<br>
               以下の内容でリクエストを承りました。</p>
               
               <div class="details">
                 <div class="details-title">Submission Details</div>
-                ${orderDetails}
+                内容を受け付けました。
               </div>
 
               <p>内容を確認の上、担当者より改めてご連絡させていただきます。<br>
@@ -185,7 +147,7 @@ export async function onRequestPost(context) {
 
       await resend.emails.send({
         from: `Merci Talent Agency <${fromEmail}>`,
-        to: [data.email],
+        to: [email],
         subject: autoReplySubject,
         html: autoReplyHtml,
       }).catch(err => console.error('Auto-reply failed:', err));
@@ -196,9 +158,6 @@ export async function onRequestPost(context) {
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return errorResponse(error);
   }
 }

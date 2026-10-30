@@ -1,3 +1,4 @@
+import ArticleHighlights from '../components/ArticleHighlights';
 import { motion } from 'motion/react';
 import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
@@ -7,6 +8,8 @@ import { Mail, MapPin, Phone, Send } from 'lucide-react';
 
 export default function Home({ settings: initialSettings }: { settings: SiteSettings | null }) {
   const [models, setModels] = useState<Model[]>([]);
+  const [articlesLoading, setArticlesLoading] = useState(true);
+  const [articleErrors, setArticleErrors] = useState({ news: false, works: false });
   const [news, setNews] = useState<News[]>([]);
   const [works, setWorks] = useState<Work[]>([]);
   const [settings, setSettings] = useState<SiteSettings | null>(initialSettings);
@@ -24,8 +27,8 @@ export default function Home({ settings: initialSettings }: { settings: SiteSett
     const fetchData = async () => {
       const [modelsRes, newsRes, worksRes, settingsRes] = await Promise.all([
         supabase.from('models').select('*').eq('active', true).order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
-        supabase.from('news').select('*').eq('active', true).order('date', { ascending: false }).limit(3),
-        supabase.from('works').select('*').eq('active', true).order('date', { ascending: false }).limit(6),
+        supabase.from('news').select('*').eq('active', true).order('date', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(5),
+        supabase.from('works').select('*').eq('active', true).order('date', { ascending: false, nullsFirst: false }).order('created_at', { ascending: false }).limit(5),
         !initialSettings ? supabase.from('site_settings').select('*').limit(1) : Promise.resolve({ data: [initialSettings] })
       ]);
       
@@ -41,6 +44,8 @@ export default function Home({ settings: initialSettings }: { settings: SiteSett
         setWorks(worksRes.data as Work[]);
       }
       
+      setArticleErrors({ news: Boolean(newsRes.error), works: Boolean(worksRes.error) });
+      setArticlesLoading(false);
       const settingsData = settingsRes.data;
       if (settingsData && settingsData.length > 0) {
         setSettings(settingsData[0] as SiteSettings);
@@ -189,53 +194,7 @@ export default function Home({ settings: initialSettings }: { settings: SiteSett
         </div>
       </section>
 
-      {/* Works Section */}
-      <section id="works" className="py-32 bg-[#F9F8F6]">
-        <div className="container-custom">
-          <div className="flex justify-between items-end mb-16">
-            <div>
-              <h2 className="text-4xl md:text-6xl font-serif tracking-widest uppercase">Works</h2>
-              <p className="text-brand-gray tracking-[0.2em] text-xs uppercase mt-4">Our achievements and projects</p>
-            </div>
-            <Link to="/works" className="text-xs tracking-[0.2em] border-b border-brand-black pb-1 hover:text-brand-gray hover:border-brand-gray transition-all">
-              VIEW ALL WORKS
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
-            {works.map((work, index) => (
-              <motion.div
-                key={work.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="group"
-              >
-                <Link to="/works">
-                  <div className="aspect-video overflow-hidden bg-brand-black/5 mb-6">
-                    <img 
-                      src={work.image || "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&q=80"} 
-                      alt={work.title}
-                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <div className="flex justify-between items-start mb-2">
-                    <p className="text-[10px] tracking-widest text-brand-gray uppercase">{work.category}</p>
-                    {work.date && (
-                      <p className="text-[10px] tracking-widest text-brand-gray/60 uppercase">
-                        {new Date(work.date).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit' }).replace(/\//g, '.')}
-                      </p>
-                    )}
-                  </div>
-                  <h3 className="text-xl font-serif tracking-widest group-hover:text-brand-gray transition-colors">{work.title}</h3>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <ArticleHighlights kind="works" items={works} loading={articlesLoading} error={articleErrors.works} />
 
       {/* Services Section */}
       <section id="services" className="py-32 bg-white">
@@ -307,48 +266,7 @@ export default function Home({ settings: initialSettings }: { settings: SiteSett
         </div>
       </section>
 
-      {/* News Section */}
-      <section id="news" className="py-32 bg-[#F2F2F2]">
-        <div className="container-custom">
-          <div className="flex justify-between items-end mb-16">
-            <div>
-              <h2 className="text-4xl md:text-6xl font-serif tracking-widest uppercase">News</h2>
-              <p className="text-brand-gray tracking-[0.2em] text-xs uppercase mt-4">Latest updates from the agency</p>
-            </div>
-            <Link to="/news" className="text-xs tracking-[0.2em] border-b border-brand-black pb-1 hover:text-brand-gray hover:border-brand-gray transition-all">
-              VIEW ALL NEWS
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            {news.map((item, index) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                className="group"
-              >
-                <Link to="/news">
-                  <div className="aspect-video overflow-hidden bg-brand-black/5 mb-6">
-                    <img 
-                      src={item.image || "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&q=80"} 
-                      alt={item.title}
-                      className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 ${item.isGrayscale ? 'grayscale' : ''}`}
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                  <p className="text-[10px] tracking-widest text-brand-gray uppercase mb-2">
-                    {item.date ? new Date(item.date).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '.') : ''}
-                  </p>
-                  <h3 className="text-xl font-serif tracking-widest group-hover:text-brand-gray transition-colors">{item.title}</h3>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <ArticleHighlights kind="news" items={news} loading={articlesLoading} error={articleErrors.news} />
 
       {/* About Section */}
       <section id="about" className="py-32 bg-white">

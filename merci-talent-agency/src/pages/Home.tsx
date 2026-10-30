@@ -257,7 +257,7 @@ export default function Home({ settings: initialSettings }: { settings: SiteSett
               <p className="text-brand-gray text-sm leading-relaxed">
                 {settings?.service_model_casting_text || 'ファッションショー、広告、カタログ、雑誌など、プロジェクトのコンセプトに最適なモデルをご提案します。国内外のネットワークを活かしたキャスティングが可能です。'}
               </p>
-              <p className="text-xs tracking-widest font-bold">STARTING FROM ¥50,000〜</p>
+              <p className="text-xs tracking-widest font-bold"></p>
             </motion.div>
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
@@ -270,7 +270,7 @@ export default function Home({ settings: initialSettings }: { settings: SiteSett
               <p className="text-brand-gray text-sm leading-relaxed">
                 {settings?.service_event_staffing_text || '展示会、プロモーションイベント、プライベートパーティーなど、華やかさとプロフェッショナリズムを兼ね備えたイベントスタッフ・コンパニオンを派遣します。'}
               </p>
-              <p className="text-xs tracking-widest font-bold">STARTING FROM ¥30,000〜</p>
+              <p className="text-xs tracking-widest font-bold"></p>
             </motion.div>
             <motion.div 
               initial={{ opacity: 0, y: 20 }}

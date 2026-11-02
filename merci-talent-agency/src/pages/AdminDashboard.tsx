@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { supabase } from '../lib/supabase';
+import { createDashboardLoader, DashboardTab, fetchDashboardTab } from '../lib/dashboardData';
 import { Model, News, Order, OrderStatus, SiteSettings, Work } from '../types';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Edit, Trash2, LogOut, LayoutDashboard, Users, Newspaper, Settings, Save, Check, Briefcase, ArrowLeft, GripVertical, Eye, X } from 'lucide-react';
@@ -111,9 +112,21 @@ export default function AdminDashboard() {
   const [works, setWorks] = useState<Work[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
-  const [activeTab, setActiveTab] = useState<'models' | 'news' | 'works' | 'orders' | 'settings'>('models');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<DashboardTab>('models');
+  const [loader] = useState(() => createDashboardLoader(
+    (tab, signal) => fetchDashboardTab(supabase, tab, signal),
+    (tab, rows) => {
+      if (tab === 'models') setModels(rows as Model[]);
+      else if (tab === 'news') setNews(rows as News[]);
+      else if (tab === 'works') setWorks(rows as Work[]);
+      else if (tab === 'orders') setOrders(rows as Order[]);
+      else setSettings((rows[0] as SiteSettings) || null);
+    },
+  ));
+  const tabStates = useSyncExternalStore(loader.subscribe, loader.getSnapshot);
+  const tabState = tabStates[activeTab];
+  const loading = tabState.loading || (!tabState.loaded && !tabState.error);
+  const error = tabState.error;
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -167,7 +180,7 @@ export default function AdminDashboard() {
       } catch (error) {
         console.error("Error updating sort order:", error);
         alert("順番の保存に失敗しました。");
-        fetchData(); // Revert to server state
+        void loader.ensure('models', true); // Revert only this tab to server state
       }
     }
   };
@@ -192,49 +205,10 @@ export default function AdminDashboard() {
     }
   };
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [modelsRes, newsRes, worksRes, settingsRes, ordersRes] = await Promise.all([
-        supabase.from('models').select('*').order('sort_order', { ascending: true }).order('created_at', { ascending: false }),
-        supabase.from('news').select('*').order('date', { ascending: false }),
-        supabase.from('works').select('*').order('date', { ascending: false }),
-        supabase.from('site_settings').select('*').limit(1),
-        supabase.from('orders').select('*').order('created_at', { ascending: false })
-      ]);
-
-      const errors = [];
-      if (modelsRes.error) errors.push(`Models: ${modelsRes.error.message}`);
-      if (newsRes.error) errors.push(`News: ${newsRes.error.message}`);
-      if (worksRes.error) errors.push(`Works: ${worksRes.error.message}`);
-      if (ordersRes.error) errors.push(`Orders: ${ordersRes.error.message}`);
-      if (settingsRes.error && settingsRes.error.code !== 'PGRST116') errors.push(`Settings: ${settingsRes.error.message}`);
-
-      if (errors.length > 0) {
-        setError(errors.join(' | '));
-      }
-      
-      setModels(modelsRes.data as Model[] || []);
-      setNews(newsRes.data as News[] || []);
-      setWorks(worksRes.data as Work[] || []);
-      setOrders(ordersRes.data as Order[] || []);
-      
-      const settingsData = settingsRes.data;
-      if (settingsData && settingsData.length > 0) {
-        setSettings(settingsData[0] as SiteSettings);
-      }
-    } catch (err: any) {
-      console.error("Error fetching data:", err);
-      setError(err.message || "An unexpected error occurred while fetching data.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchData();
-  }, []);
+    void loader.ensure(activeTab);
+  }, [activeTab, loader]);
+  useEffect(() => () => loader.cancel(), [loader]);
 
   const handleDeleteConfirm = async () => {
     const { id, type } = deleteModal;
@@ -375,25 +349,25 @@ export default function AdminDashboard() {
           onClick={() => setActiveTab('models')}
           className={`pb-4 text-xs tracking-widest transition-all ${activeTab === 'models' ? 'border-b-2 border-brand-black font-bold' : 'text-brand-gray'}`}
         >
-          TALENT ({models.length})
+          TALENT{tabStates.models.loaded ? ` (${models.length})` : ''}
         </button>
         <button 
           onClick={() => setActiveTab('works')}
           className={`pb-4 text-xs tracking-widest transition-all ${activeTab === 'works' ? 'border-b-2 border-brand-black font-bold' : 'text-brand-gray'}`}
         >
-          WORKS ({works.length})
+          WORKS{tabStates.works.loaded ? ` (${works.length})` : ''}
         </button>
         <button 
           onClick={() => setActiveTab('news')}
           className={`pb-4 text-xs tracking-widest transition-all ${activeTab === 'news' ? 'border-b-2 border-brand-black font-bold' : 'text-brand-gray'}`}
         >
-          NEWS ({news.length})
+          NEWS{tabStates.news.loaded ? ` (${news.length})` : ''}
         </button>
         <button 
           onClick={() => setActiveTab('orders')}
           className={`pb-4 text-xs tracking-widest transition-all ${activeTab === 'orders' ? 'border-b-2 border-brand-black font-bold' : 'text-brand-gray'}`}
         >
-          ORDERS ({orders.length})
+          ORDERS{tabStates.orders.loaded ? ` (${orders.length})` : ''}
         </button>
         <button 
           onClick={() => setActiveTab('settings')}
@@ -406,7 +380,7 @@ export default function AdminDashboard() {
       {error && (
         <div className="mb-8 p-4 bg-red-50 border border-red-200 text-red-600 text-xs tracking-widest uppercase rounded-lg flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={() => fetchData()} className="underline hover:no-underline">Retry</button>
+          <button onClick={() => void loader.ensure(activeTab, true)} className="underline hover:no-underline">Retry</button>
         </div>
       )}
 

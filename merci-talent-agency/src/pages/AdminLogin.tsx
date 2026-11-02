@@ -1,39 +1,33 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { Mail, Lock } from 'lucide-react';
 
-export default function AdminLogin() {
+export default function AdminLogin({ checking = false, authError = null }: { checking?: boolean; authError?: string | null }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+  const submitting = useRef(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting.current || checking) return;
+    submitting.current = true;
     setLoading(true);
     setError('');
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (error) throw error;
-      const response = await fetch('/api/admin-session', {
-        headers: { Authorization: `Bearer ${data.session.access_token}` }, cache: 'no-store',
-      });
-      if (!response.ok) {
-        await supabase.auth.signOut();
-        throw new Error('Administrator permission could not be verified');
-      }
-      navigate('/admin/dashboard');
-    } catch (err: any) {
-      console.error(err);
+      // App's shared auth subscriber verifies the session and redirects only on success.
+    } catch {
       setError('Sign-in or administrator permission could not be verified. Please contact the site owner.');
     } finally {
       setLoading(false);
+      submitting.current = false;
     }
   };
 
@@ -50,9 +44,9 @@ export default function AdminLogin() {
         </div>
         
         <form onSubmit={handleLogin} className="space-y-8">
-          {error && (
+          {(error || authError) && (
             <div className="p-4 bg-red-50 text-red-500 text-[10px] tracking-widest text-center">
-              {error}
+              {error || authError}
             </div>
           )}
 
@@ -90,10 +84,10 @@ export default function AdminLogin() {
 
           <button 
             type="submit"
-            disabled={loading}
+            disabled={loading || checking}
             className="btn-primary w-full flex items-center justify-center space-x-4 disabled:opacity-50 py-4"
           >
-            {loading ? (
+            {loading || checking ? (
               <div className="w-5 h-5 border-2 border-brand-white border-t-transparent rounded-full animate-spin"></div>
             ) : (
               <span className="tracking-[0.3em] text-xs">LOGIN</span>

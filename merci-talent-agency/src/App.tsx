@@ -1,7 +1,9 @@
 import ArticleDetail from './pages/ArticleDetail';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { supabase } from './lib/supabase';
+import { connectAdminSession, createAdminSessionStore } from './lib/adminSession';
+import AdminGuard from './components/AdminGuard';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
@@ -19,45 +21,18 @@ import AdminWorkForm from './pages/AdminWorkForm';
 import { SiteSettings } from './types';
 
 export default function App() {
-  const [user, setUser] = useState<any>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [adminSession] = useState(() => createAdminSessionStore());
+  const auth = useSyncExternalStore(adminSession.subscribe, adminSession.getSnapshot);
   const [settings, setSettings] = useState<SiteSettings | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    let generation = 0;
-    const verifySession = async (session: any) => {
-      const current = ++generation;
-      setIsAdmin(false);
-      setUser(session?.user ?? null);
-      setLoading(true);
-      let authorized = false;
-      try {
-        if (session?.access_token) {
-          const response = await fetch('/api/admin-session', {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-            cache: 'no-store',
-          });
-          authorized = response.ok && (await response.json()).admin === true;
-        }
-      } catch { /* Fail closed when verification is unavailable. */ }
-      if (!cancelled && current === generation) {
-        setIsAdmin(authorized);
-        setLoading(false);
-      }
-    };
-    supabase.auth.getSession().then(({ data: { session } }) => verifySession(session)).catch(() => {
-      if (!cancelled) setLoading(false);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      void verifySession(session);
-    });
+    const disconnect = connectAdminSession(adminSession, supabase.auth);
 
     // Fetch site settings
     const fetchSettings = async () => {
       const { data } = await supabase.from('site_settings').select('*').limit(1);
-      if (data && data.length > 0) {
+      if (!cancelled && data && data.length > 0) {
         setSettings(data[0] as SiteSettings);
       }
     };
@@ -75,24 +50,16 @@ export default function App() {
 
     return () => {
       cancelled = true;
-      subscription.unsubscribe();
+      disconnect();
       supabase.removeChannel(settingsChannel);
     };
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="h-screen w-screen flex items-center justify-center bg-brand-white">
-        <div className="w-12 h-12 border-2 border-brand-black border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
+  }, [adminSession]);
 
   return (
     <Router>
       <ScrollToTop />
       <div className="flex flex-col min-h-screen">
-        <Navbar user={isAdmin ? user : null} />
+        <Navbar user={auth.isAdmin ? auth.user : null} />
         <main className="flex-grow">
           <Routes>
             <Route path="/" element={<Home settings={settings} />} />
@@ -105,14 +72,14 @@ export default function App() {
             <Route path="/works/:id" element={<ArticleDetail kind="works" />} />
             
             {/* Admin Routes */}
-            <Route path="/admin/login" element={isAdmin ? <Navigate to="/admin/dashboard" /> : <AdminLogin />} />
-            <Route path="/admin/dashboard" element={isAdmin ? <AdminDashboard /> : <Navigate to="/admin/login" />} />
-            <Route path="/admin/models/new" element={isAdmin ? <AdminModelForm /> : <Navigate to="/admin/login" />} />
-            <Route path="/admin/models/edit/:id" element={isAdmin ? <AdminModelForm /> : <Navigate to="/admin/login" />} />
-            <Route path="/admin/news/new" element={isAdmin ? <AdminNewsForm /> : <Navigate to="/admin/login" />} />
-            <Route path="/admin/news/edit/:id" element={isAdmin ? <AdminNewsForm /> : <Navigate to="/admin/login" />} />
-            <Route path="/admin/works/new" element={isAdmin ? <AdminWorkForm /> : <Navigate to="/admin/login" />} />
-            <Route path="/admin/works/edit/:id" element={isAdmin ? <AdminWorkForm /> : <Navigate to="/admin/login" />} />
+            <Route path="/admin/login" element={auth.isAdmin ? <Navigate to="/admin/dashboard" replace /> : <AdminLogin checking={auth.checking} authError={auth.error} />} />
+            <Route path="/admin/dashboard" element={<AdminGuard auth={auth}><AdminDashboard /></AdminGuard>} />
+            <Route path="/admin/models/new" element={<AdminGuard auth={auth}><AdminModelForm /></AdminGuard>} />
+            <Route path="/admin/models/edit/:id" element={<AdminGuard auth={auth}><AdminModelForm /></AdminGuard>} />
+            <Route path="/admin/news/new" element={<AdminGuard auth={auth}><AdminNewsForm /></AdminGuard>} />
+            <Route path="/admin/news/edit/:id" element={<AdminGuard auth={auth}><AdminNewsForm /></AdminGuard>} />
+            <Route path="/admin/works/new" element={<AdminGuard auth={auth}><AdminWorkForm /></AdminGuard>} />
+            <Route path="/admin/works/edit/:id" element={<AdminGuard auth={auth}><AdminWorkForm /></AdminGuard>} />
           </Routes>
         </main>
         <Footer settings={settings} />

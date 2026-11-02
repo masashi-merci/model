@@ -1,6 +1,6 @@
-# Supabase読み取りチェック案（未有効化）
+# Supabase読み取りチェック（有効化済み）
 
-このディレクトリの `supabase-readonly-healthcheck.yml` は **`.github/workflows/` の外**にあるレビュー用の定期実行案です。公開・有効化の承認後、`.github/workflows/supabase-readonly-healthcheck.yml` に手動実行のみの版を追加しました。default branch反映・既存公開キー設定・手動実行の成功を確認してから、承認済みのscheduleを有効にします。公開キーの値はリポジトリに含めません。
+`automation-drafts/supabase-readonly-healthcheck.yml` はレビュー用の控えです。本番の `.github/workflows/supabase-readonly-healthcheck.yml` では、承認済みの1日3回のscheduleを有効にしました。既存のPublishable keyをGitHub Actions secret `SUPABASE_PUBLIC_ANON_KEY` に設定し、[手動実行 #1](https://github.com/masashi-merci/model/actions/runs/41414346034) でHTTP 200・初回試行成功（読み取り1,419 ms、ジョブ全体23秒）を確認してから有効化しています。キー値はリポジトリに含めません。
 
 ## 提案する動作
 
@@ -11,7 +11,7 @@
 - 各要求は15秒のタイムアウト。ネットワーク障害、429、一部5xxのみ最大3回（再試行待ち2秒・4秒）。401/403などは即失敗。リダイレクトは追いません。ジョブ全体は3分で打ち切ります。
 - `workflow_dispatch` は、有効化後にGitHub Actionsから同じ読み取りチェックを手動実行するための入口です。
 
-## 有効化する場合のレビュー手順（まだ実行しない）
+## 運用・設定変更時の確認手順
 
 1. オーナーが対象・時刻・読み取り内容を確認し、有効化を明示的に承認する。
 2. `news` の公開読み取り用RLSを確認する。失敗してもこのチェックのためにRLSを弱めない。
@@ -23,7 +23,7 @@
 
 現在のアプリは `merci-talent-agency/src/lib/supabase.ts` から `VITE_SUPABASE_URL` と `VITE_SUPABASE_ANON_KEY` を読み込みます。Cloudflare PagesのProductionにはこの設定があり、GitHub Actionsへ自動的に引き継がれるものではありません。
 
-有効化の承認後、所有者のSupabaseダッシュボードで対象プロジェクトのAPI Keysを開き、**既存のPublishable key、またはLegacy anon key**を選びます。GitHubの `masashi-merci/model` → Settings → Secrets and variables → Actions で、repository secret `SUPABASE_PUBLIC_ANON_KEY` として設定します。workflowはこのsecretをプロセス環境変数 `SUPABASE_PUBLIC_KEY` に渡します。値をチャットに送る必要はありません。既存キーのローテーション、新規キーの発行、Cloudflare変数の変更は不要です。この準備作業では値を取得せず、GitHub secretも作成していません。
+有効化の承認後、所有者のSupabaseダッシュボードで対象プロジェクトのAPI Keysを開き、**既存のPublishable key、またはLegacy anon key**を選びます。GitHubの `masashi-merci/model` → Settings → Secrets and variables → Actions で、repository secret `SUPABASE_PUBLIC_ANON_KEY` として設定します。workflowはこのsecretをプロセス環境変数 `SUPABASE_PUBLIC_KEY` に渡します。値をチャットに送る必要はありません。既存キーのローテーション、新規キーの発行、Cloudflare変数の変更は不要です。既存のPublishable keyを同名のGitHub secretに設定済みです。キー値は本文やリポジトリに記録しません。
 
 ## 限界
 

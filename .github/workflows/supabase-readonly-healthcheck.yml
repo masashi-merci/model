@@ -1,8 +1,11 @@
-# Start with a manual run; enable the reviewed schedule after it succeeds.
+# Approved schedule, enabled after a successful public read check.
 name: Supabase public read check
 
 on:
   workflow_dispatch:
+  schedule:
+    # UTC 01:17, 09:17, 17:17 (JST 10:17, 18:17, 02:17).
+    - cron: '17 1,9,17 * * *'
 
 permissions:
   contents: read
